@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const app = express();
+app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const items = [];
 
@@ -13,7 +14,14 @@ app.get('/api/test', (req, res) => {
 });
 
 app.post('/api/test', (req, res) => {
-  items.push({ message: 'New item added' });
+  if (!req.body || Object.keys(req.body).length === 0 || !req.body.name || req.body.name.trim() === '') {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  const newItem = {
+    name: req.body.name,
+    createdAt: new Date()
+  };
+  items.push(newItem);
   res.json(items);
 });
 
