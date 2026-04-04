@@ -10,7 +10,7 @@ passport.use(new GitHubStrategy({
   clientSecret: process.env.GITHUB_CLIENT_SECRET,
   callbackURL: 'http://localhost:3000/auth/github/callback'
 }, (accessToken, refreshToken, profile, done) => {
-  return done(null, profile);
+  return done(null, { profile, accessToken });
 }));
 
 passport.serializeUser((user, done) => {
@@ -50,6 +50,27 @@ app.post('/api/test', (req, res) => {
   };
   items.push(newItem);
   res.json(items);
+});
+
+app.get('/api/repos', async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const accessToken = req.user.accessToken;
+  const response = await fetch('https://api.github.com/user/repos', {
+    headers: {
+      Authorization: `token ${accessToken}`
+    }
+  });
+  const data = await response.json();
+  const portfolioRepos = data.map(repo => ({
+    title: repo.name,
+    summary: repo.description || 'No description',
+    link: repo.html_url,
+    tech: repo.language,
+    lastUpdated: repo.updated_at
+  }));
+  res.json(portfolioRepos);
 });
 
 app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
