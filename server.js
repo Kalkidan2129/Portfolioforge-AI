@@ -31,6 +31,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 const PORT = process.env.PORT || 3000;
 const items = [];
+const userPortfolios = new Map();
 
 app.get('/', (req, res) => {
   res.send('Server is running');
@@ -71,6 +72,50 @@ app.get('/api/repos', async (req, res) => {
     lastUpdated: repo.updated_at
   }));
   res.json(portfolioRepos);
+});
+
+app.post('/api/portfolio', (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const userId = req.user.profile.id;
+  userPortfolios.set(userId, req.body);
+  res.json({ message: 'Portfolio saved' });
+});
+
+app.get('/api/portfolio', (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const userId = req.user.profile.id;
+  const portfolio = userPortfolios.get(userId);
+  if (!portfolio) {
+    return res.json({ message: 'No portfolio found' });
+  }
+  res.json(portfolio);
+});
+
+app.get('/api/portfolio/save-from-github', async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const accessToken = req.user.accessToken;
+  const response = await fetch('https://api.github.com/user/repos', {
+    headers: {
+      Authorization: `token ${accessToken}`
+    }
+  });
+  const data = await response.json();
+  const portfolioRepos = data.map(repo => ({
+    title: repo.name,
+    summary: repo.description || 'No description',
+    link: repo.html_url,
+    tech: repo.language,
+    lastUpdated: repo.updated_at
+  }));
+  const userId = req.user.profile.id;
+  userPortfolios.set(userId, portfolioRepos);
+  res.json({ message: 'Portfolio saved', count: portfolioRepos.length });
 });
 
 app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
