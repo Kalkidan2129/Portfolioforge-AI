@@ -95,6 +95,34 @@ app.get('/api/portfolio', (req, res) => {
   res.json(portfolio);
 });
 
+app.get('/api/portfolio/generate', (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const userId = req.user.profile.id;
+  const portfolio = userPortfolios.get(userId);
+  if (!portfolio) {
+    return res.json({ message: 'No portfolio found' });
+  }
+  const username = req.user.profile.username;
+  const techSet = new Set();
+  portfolio.forEach(project => {
+    if (project.tech) {
+      techSet.add(project.tech);
+    }
+  });
+  const techSummary = Array.from(techSet);
+  const portfolioSummary = `${username} has built ${portfolio.length} projects using ${techSummary.join(', ')}.`;
+  res.json({
+    owner: username,
+    portfolioTitle: `${username}'s Portfolio`,
+    projectCount: portfolio.length,
+    projects: portfolio,
+    techSummary,
+    portfolioSummary
+  });
+});
+
 app.get('/api/portfolio/save-from-github', async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
