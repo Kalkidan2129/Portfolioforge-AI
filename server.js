@@ -155,6 +155,37 @@ app.get('/auth/github/callback',
   }
 );
 
+app.get('/portfolio/view', (req, res) => {
+  if (!req.user) {
+    return res.status(401).send('Unauthorized');
+  }
+  const userId = req.user.profile.id;
+  const portfolio = userPortfolios.get(userId);
+  if (!portfolio) {
+    return res.send('No portfolio found');
+  }
+  const username = req.user.profile.username;
+  const techSet = new Set();
+  portfolio.forEach(project => {
+    if (project.tech) {
+      techSet.add(project.tech);
+    }
+  });
+  const techSummary = Array.from(techSet);
+  const portfolioSummary = `${username} has built ${portfolio.length} projects using ${techSummary.join(', ')}.`;
+  const projectsList = portfolio.map(project => 
+    `<li><strong>${project.title}</strong> - ${project.summary} (${project.tech}) <a href="${project.link}">View</a></li>`
+  ).join('');
+  res.send(`
+    <h1>${username}'s Portfolio</h1>
+    <p>${portfolioSummary}</p>
+    <p>Total Projects: ${portfolio.length}</p>
+    <p>Technologies: ${techSummary.join(', ')}</p>
+    <h2>Projects</h2>
+    <ul>${projectsList}</ul>
+  `);
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
