@@ -123,6 +123,34 @@ app.get('/api/portfolio/generate', (req, res) => {
   });
 });
 
+app.get('/api/portfolio/generate-narrative', (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const userId = req.user.profile.id;
+  const portfolio = userPortfolios.get(userId);
+  if (!portfolio) {
+    return res.json({ message: 'No portfolio found' });
+  }
+  const username = req.user.profile.username;
+  const techSet = new Set();
+  portfolio.forEach(project => {
+    if (project.tech) {
+      techSet.add(project.tech);
+    }
+  });
+  const techSummary = Array.from(techSet);
+  const narrativePrompt = `Write a professional portfolio summary for ${username} who has built ${portfolio.length} projects using ${techSummary.join(', ')}.`;
+  const generatedNarrative = `${username} is a developer who has built ${portfolio.length} projects using ${techSummary.join(', ')}. Their portfolio highlights practical experience and technical growth.`;
+  res.json({
+    owner: username,
+    projectCount: portfolio.length,
+    techSummary,
+    narrativePrompt,
+    generatedNarrative
+  });
+});
+
 app.get('/api/portfolio/save-from-github', async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -172,13 +200,13 @@ app.get('/portfolio/view', (req, res) => {
     }
   });
   const techSummary = Array.from(techSet);
-  const portfolioSummary = `${username} has built ${portfolio.length} projects using ${techSummary.join(', ')}.`;
+  const generatedNarrative = `${username} is a developer who has built ${portfolio.length} projects using ${techSummary.join(', ')}. Their portfolio highlights practical experience and technical growth.`;
   const projectsList = portfolio.map(project => 
     `<li><strong>${project.title}</strong> - ${project.summary} (${project.tech}) <a href="${project.link}">View</a></li>`
   ).join('');
   res.send(`
     <h1>${username}'s Portfolio</h1>
-    <p>${portfolioSummary}</p>
+    <p>${generatedNarrative}</p>
     <p>Total Projects: ${portfolio.length}</p>
     <p>Technologies: ${techSummary.join(', ')}</p>
     <h2>Projects</h2>
