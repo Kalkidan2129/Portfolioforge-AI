@@ -201,17 +201,49 @@ app.get('/portfolio/view', (req, res) => {
   });
   const techSummary = Array.from(techSet);
   const generatedNarrative = `${username} is a developer who has built ${portfolio.length} projects using ${techSummary.join(', ')}. Their portfolio highlights practical experience and technical growth.`;
+  // ✅ ADD THIS BLOCK HERE
+const recommendations = [];
+
+if (portfolio.length === 0) {
+  recommendations.push('Start by saving your GitHub repositories to build your portfolio.');
+} else {
+  if (portfolio.length < 3) {
+    recommendations.push('Consider adding more projects to showcase your skills. Aim for at least 3-5 projects.');
+  } else if (portfolio.length < 5) {
+    recommendations.push('Good progress! Continue building projects to strengthen your portfolio.');
+  }
+
+  if (techSummary.length < 3) {
+    recommendations.push('Expand your tech stack by learning new technologies to show versatility.');
+  }
+
+  const projectsWithNoDescription = portfolio.filter(
+    p => !p.summary || p.summary === 'No description' || p.summary.trim() === ''
+  ).length;
+
+  if (projectsWithNoDescription > 0) {
+    recommendations.push(
+      `${projectsWithNoDescription} project(s) have missing descriptions. Add clear descriptions to explain your work.`
+    );
+  }
+}
   const projectsList = portfolio.map(project => 
     `<li><strong>${project.title}</strong> - ${project.summary} (${project.tech}) <a href="${project.link}">View</a></li>`
   ).join('');
   res.send(`
-    <h1>${username}'s Portfolio</h1>
-    <p>${generatedNarrative}</p>
-    <p>Total Projects: ${portfolio.length}</p>
-    <p>Technologies: ${techSummary.join(', ')}</p>
-    <h2>Projects</h2>
-    <ul>${projectsList}</ul>
-  `);
+  <h1>${username}'s Portfolio</h1>
+  <p>${generatedNarrative}</p>
+  <p>Total Projects: ${portfolio.length}</p>
+  <p>Technologies: ${techSummary.join(', ')}</p>
+
+  <h2>Projects</h2>
+  <ul>${projectsList}</ul>
+
+  <h2>Recommendations</h2>
+  <ul>
+    ${recommendations.map(r => `<li>${r}</li>`).join('')}
+  </ul>
+`);
 });
 
 app.listen(PORT, () => {
