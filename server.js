@@ -66,9 +66,9 @@ app.get('/api/repos', async (req, res) => {
   const data = await response.json();
   const portfolioRepos = data.map(repo => ({
     title: repo.name,
-    summary: repo.description || 'No description',
+    summary: repo.description || 'No description available',
     link: repo.html_url,
-    tech: repo.language,
+    tech: repo.language || 'Not specified',
     lastUpdated: repo.updated_at
   }));
   res.json(portfolioRepos);
@@ -111,8 +111,8 @@ app.get('/api/portfolio/generate', (req, res) => {
       techSet.add(project.tech);
     }
   });
-  const techSummary = Array.from(techSet);
-  const portfolioSummary = `${username} has built ${portfolio.length} projects using ${techSummary.join(', ')}.`;
+  const techSummary = Array.from(techSet).filter(tech => tech !== 'Not specified');
+  const portfolioSummary = `${username} is a passionate developer with hands-on experience building real-world applications using ${techSummary.join(', ')}. With ${portfolio.length} completed projects, their work demonstrates strong problem-solving skills, continuous learning, and practical development experience.`;
   res.json({
     owner: username,
     portfolioTitle: `${username}'s Portfolio`,
@@ -139,9 +139,9 @@ app.get('/api/portfolio/generate-narrative', (req, res) => {
       techSet.add(project.tech);
     }
   });
-  const techSummary = Array.from(techSet);
+  const techSummary = Array.from(techSet).filter(tech => tech !== 'Not specified');
   const narrativePrompt = `Write a professional portfolio summary for ${username} who has built ${portfolio.length} projects using ${techSummary.join(', ')}.`;
-  const generatedNarrative = `${username} is a developer who has built ${portfolio.length} projects using ${techSummary.join(', ')}. Their portfolio highlights practical experience and technical growth.`;
+  const generatedNarrative = `${username} is a passionate developer with hands-on experience building real-world applications using ${techSummary.join(', ')}. With ${portfolio.length} completed projects, their work demonstrates strong problem-solving skills, continuous learning, and practical development experience.`;
   res.json({
     owner: username,
     projectCount: portfolio.length,
@@ -164,9 +164,9 @@ app.get('/api/portfolio/save-from-github', async (req, res) => {
   const data = await response.json();
   const portfolioRepos = data.map(repo => ({
     title: repo.name,
-    summary: repo.description || 'No description',
+    summary: repo.description || 'No description available',
     link: repo.html_url,
-    tech: repo.language,
+    tech: repo.language || 'Not specified',
     lastUpdated: repo.updated_at
   }));
   const userId = req.user.profile.id;
@@ -199,26 +199,22 @@ app.get('/portfolio/view', (req, res) => {
       techSet.add(project.tech);
     }
   });
-  const techSummary = Array.from(techSet);
-  const generatedNarrative = `${username} is a developer who has built ${portfolio.length} projects using ${techSummary.join(', ')}. Their portfolio highlights practical experience and technical growth.`;
+  const techSummary = Array.from(techSet).filter(tech => tech !== 'Not specified');
+  const generatedNarrative = `${username} is a passionate developer with hands-on experience building real-world applications using ${techSummary.join(', ')}. With ${portfolio.length} completed projects, their work demonstrates strong problem-solving skills, continuous learning, and practical development experience.`;
   // ✅ ADD THIS BLOCK HERE
 const recommendations = [];
 
 if (portfolio.length === 0) {
   recommendations.push('Start by saving your GitHub repositories to build your portfolio.');
 } else {
-  if (portfolio.length < 3) {
-    recommendations.push('Consider adding more projects to showcase your skills. Aim for at least 3-5 projects.');
-  } else if (portfolio.length < 5) {
-    recommendations.push('Good progress! Continue building projects to strengthen your portfolio.');
-  }
-
-  if (techSummary.length < 3) {
-    recommendations.push('Expand your tech stack by learning new technologies to show versatility.');
-  }
+  
 
   const projectsWithNoDescription = portfolio.filter(
-    p => !p.summary || p.summary === 'No description' || p.summary.trim() === ''
+    p => 
+      !p.summary || 
+      p.summary === 'No description' || 
+      p.summary === 'No description available' ||
+      p.summary.trim() === ''
   ).length;
 
   if (projectsWithNoDescription > 0) {
@@ -226,15 +222,82 @@ if (portfolio.length === 0) {
       `${projectsWithNoDescription} project(s) have missing descriptions. Add clear descriptions to explain your work.`
     );
   }
+  if (techSummary.length < 3) {
+    recommendations.push('Expand your tech stack by learning new technologies to show versatility.');
+  }
+
+  if (techSummary.includes('JavaScript')) {
+    recommendations.push('Consider building a full-stack project to showcase end-to-end development skills.');
+  }
+
+  if (portfolio.length < 3) {
+    recommendations.push('Consider adding more projects to showcase your skills. Aim for at least 3-5 projects.');
+  } else if (portfolio.length < 5) {
+    recommendations.push('Good progress! Continue building projects to strengthen your portfolio.');
+  } else if (portfolio.length >= 5) {
+    recommendations.push('Great portfolio size! Consider highlighting your top 2–3 projects to make your profile more focused.');
+  }
+
+  
 }
   const projectsList = portfolio.map(project => 
-    `<li><strong>${project.title}</strong> - ${project.summary} (${project.tech}) <a href="${project.link}">View</a></li>`
+    `<li><strong>${project.title}</strong> - ${project.summary} (${project.tech === 'Not specified' ? 'N/A' : project.tech}) <a href="${project.link}">View</a></li>`
   ).join('');
   res.send(`
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 40px 0;
+      background-color: #f8f9fb;
+      color: #222;
+      line-height: 1.6;
+      
+    }
+    .container {
+      background: white;
+      padding: 30px 40px;
+      border-radius: 12px;
+      max-width: 1000px;
+      width: 90%;
+      margin: 0 auto;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }  
+    h1 {
+      color: #1f3c88;
+      margin-bottom: 20px;
+    }
+    h2 {
+      color: #2c3e50;
+      margin-top: 35px;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #dfe6ee;
+      padding-bottom: 5px;
+    }
+    p {
+      margin: 10px 0;
+      max-width: 1000px;
+    }
+    ul {
+      padding-left: 25px;
+    }
+    li {
+      margin-bottom: 10px;
+    }
+    a {
+      color: #1f6feb;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+<div class="container">
   <h1>${username}'s Portfolio</h1>
   <p>${generatedNarrative}</p>
-  <p>Total Projects: ${portfolio.length}</p>
-  <p>Technologies: ${techSummary.join(', ')}</p>
+  <p><strong>Total Projects:</strong> ${portfolio.length}</p>
+  <p><strong>Technologies:</strong> ${techSummary.join(', ')}</p>
 
   <h2>Projects</h2>
   <ul>${projectsList}</ul>
@@ -243,6 +306,7 @@ if (portfolio.length === 0) {
   <ul>
     ${recommendations.map(r => `<li>${r}</li>`).join('')}
   </ul>
+</div>
 `);
 });
 
