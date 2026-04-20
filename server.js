@@ -32,6 +32,8 @@ app.use(passport.session());
 const PORT = process.env.PORT || 3000;
 const items = [];
 const userPortfolios = new Map();
+let portfolioViews = 0;
+let portfolioSaves = 0;
 
 app.get('/', (req, res) => {
   res.send('Server is running');
@@ -171,6 +173,7 @@ app.get('/api/portfolio/save-from-github', async (req, res) => {
   }));
   const userId = req.user.profile.id;
   userPortfolios.set(userId, portfolioRepos);
+  portfolioSaves++;
   res.json({ message: 'Portfolio saved', count: portfolioRepos.length });
 });
 
@@ -192,6 +195,7 @@ app.get('/portfolio/view', (req, res) => {
   if (!portfolio) {
     return res.send('No portfolio found');
   }
+  portfolioViews++;
   const username = req.user.profile.username;
   const techSet = new Set();
   portfolio.forEach(project => {
@@ -306,8 +310,18 @@ if (portfolio.length === 0) {
   <ul>
     ${recommendations.map(r => `<li>${r}</li>`).join('')}
   </ul>
+  <h2>Analytics</h2>
+  <p>Portfolio Views: ${portfolioViews}</p>
+  <p>Portfolio Saves: ${portfolioSaves}</p>
 </div>
 `);
+});
+
+app.get('/api/analytics', (req, res) => {
+  res.json({
+    portfolioViews,
+    portfolioSaves
+  });
 });
 
 app.listen(PORT, () => {
