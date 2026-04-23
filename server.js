@@ -3,6 +3,7 @@ const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
 const GitHubStrategy = require('passport-github2').Strategy;
+const { sql, connectDB } = require('./config/db');
 const app = express();
 
 passport.use(new GitHubStrategy({
@@ -31,7 +32,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 const PORT = process.env.PORT || 3000;
 const items = [];
-const userPortfolios = new Map();
+
 let portfolioViews = 0;
 let portfolioSaves = 0;
 
@@ -76,36 +77,58 @@ app.get('/api/repos', async (req, res) => {
   res.json(portfolioRepos);
 });
 
-app.post('/api/portfolio', (req, res) => {
+
+
+app.get('/api/portfolio', async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  const userId = req.user.profile.id;
-  userPortfolios.set(userId, req.body);
-  res.json({ message: 'Portfolio saved' });
+
+  const userId = String(req.user.profile.id);
+
+  try {
+    const result = await sql.query`
+      SELECT PortfolioJson
+      FROM UserPortfolios
+      WHERE GitHubUserId = ${userId}
+    `;
+
+    if (result.recordset.length === 0) {
+      return res.json({ message: 'No portfolio found' });
+    }
+
+    const portfolio = JSON.parse(result.recordset[0].PortfolioJson);
+    res.json(portfolio);
+  } catch (err) {
+    console.error('❌ Error fetching portfolio from DB:', err);
+    res.status(500).json({ error: 'Failed to fetch portfolio from database' });
+  }
 });
 
-app.get('/api/portfolio', (req, res) => {
+app.get('/api/portfolio/generate', async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  const userId = req.user.profile.id;
-  const portfolio = userPortfolios.get(userId);
-  if (!portfolio) {
-    return res.json({ message: 'No portfolio found' });
-  }
-  res.json(portfolio);
-});
+  const userId = String(req.user.profile.id);
 
-app.get('/api/portfolio/generate', (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  const userId = req.user.profile.id;
-  const portfolio = userPortfolios.get(userId);
-  if (!portfolio) {
+let portfolio;
+
+try {
+  const result = await sql.query`
+    SELECT PortfolioJson
+    FROM UserPortfolios
+    WHERE GitHubUserId = ${userId}
+  `;
+
+  if (result.recordset.length === 0) {
     return res.json({ message: 'No portfolio found' });
   }
+
+  portfolio = JSON.parse(result.recordset[0].PortfolioJson);
+} catch (err) {
+  console.error('❌ Error generating portfolio from DB:', err);
+  return res.status(500).json({ error: 'Failed to generate portfolio from database' });
+}
   const username = req.user.profile.username;
   const techSet = new Set();
   portfolio.forEach(project => {
@@ -125,15 +148,30 @@ app.get('/api/portfolio/generate', (req, res) => {
   });
 });
 
-app.get('/api/portfolio/generate-narrative', (req, res) => {
+app.get('/api/portfolio/generate-narrative', async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  const userId = req.user.profile.id;
-  const portfolio = userPortfolios.get(userId);
-  if (!portfolio) {
+  const userId = String(req.user.profile.id);
+
+let portfolio;
+
+try {
+  const result = await sql.query`
+    SELECT PortfolioJson
+    FROM UserPortfolios
+    WHERE GitHubUserId = ${userId}
+  `;
+
+  if (result.recordset.length === 0) {
     return res.json({ message: 'No portfolio found' });
   }
+
+  portfolio = JSON.parse(result.recordset[0].PortfolioJson);
+} catch (err) {
+  console.error('❌ Error generating narrative from DB:', err);
+  return res.status(500).json({ error: 'Failed to generate narrative from database' });
+}
   const username = req.user.profile.username;
   const techSet = new Set();
   portfolio.forEach(project => {
@@ -172,9 +210,22 @@ app.get('/api/portfolio/save-from-github', async (req, res) => {
     lastUpdated: repo.updated_at
   }));
   const userId = req.user.profile.id;
-  userPortfolios.set(userId, portfolioRepos);
-  portfolioSaves++;
-  res.json({ message: 'Portfolio saved', count: portfolioRepos.length });
+
+await sql.query`
+  MERGE UserPortfolios AS target
+  USING (SELECT ${String(userId)} AS GitHubUserId) AS source
+  ON target.GitHubUserId = source.GitHubUserId
+  WHEN MATCHED THEN
+    UPDATE SET
+      PortfolioJson = ${JSON.stringify(portfolioRepos)},
+      UpdatedAt = GETDATE()
+  WHEN NOT MATCHED THEN
+    INSERT (GitHubUserId, PortfolioJson, UpdatedAt)
+    VALUES (${String(userId)}, ${JSON.stringify(portfolioRepos)}, GETDATE());
+`;
+
+portfolioSaves++;
+res.json({ message: 'Portfolio saved to database', count: portfolioRepos.length });
 });
 
 app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
@@ -186,15 +237,30 @@ app.get('/auth/github/callback',
   }
 );
 
-app.get('/portfolio/view', (req, res) => {
+app.get('/portfolio/view', async (req, res) => {
   if (!req.user) {
     return res.status(401).send('Unauthorized');
   }
-  const userId = req.user.profile.id;
-  const portfolio = userPortfolios.get(userId);
-  if (!portfolio) {
+  const userId = String(req.user.profile.id);
+
+let portfolio;
+
+try {
+  const result = await sql.query`
+    SELECT PortfolioJson
+    FROM UserPortfolios
+    WHERE GitHubUserId = ${userId}
+  `;
+
+  if (result.recordset.length === 0) {
     return res.send('No portfolio found');
   }
+
+  portfolio = JSON.parse(result.recordset[0].PortfolioJson);
+} catch (err) {
+  console.error('❌ Error loading portfolio from DB:', err);
+  return res.status(500).send('Failed to load portfolio from database');
+}
   portfolioViews++;
   const username = req.user.profile.username;
   const techSet = new Set();
@@ -205,7 +271,7 @@ app.get('/portfolio/view', (req, res) => {
   });
   const techSummary = Array.from(techSet).filter(tech => tech !== 'Not specified');
   const generatedNarrative = `${username} is a passionate developer with hands-on experience building real-world applications using ${techSummary.join(', ')}. With ${portfolio.length} completed projects, their work demonstrates strong problem-solving skills, continuous learning, and practical development experience.`;
-  // ✅ ADD THIS BLOCK HERE
+  
 const recommendations = [];
 
 if (portfolio.length === 0) {
@@ -324,6 +390,8 @@ app.get('/api/analytics', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
 });
