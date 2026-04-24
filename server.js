@@ -360,8 +360,52 @@ app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] 
 
 app.get('/auth/github/callback', 
   passport.authenticate('github', { failureRedirect: '/' }),
-  (req, res) => {
-    res.redirect('/dashboard');
+  async (req, res) => {
+    const accessToken = req.user.accessToken;
+
+const response = await fetch('https://api.github.com/user/repos', {
+  headers: {
+    Authorization: `token ${accessToken}`
+  }
+});
+
+const data = await response.json();
+
+const portfolioRepos = data.map(repo => ({
+  title: repo.name,
+  summary: repo.description || 'No description available',
+  link: repo.html_url,
+  tech: repo.language || 'Not specified',
+  lastUpdated: repo.updated_at
+}));
+
+const userId = req.user.profile.id;
+
+// Save to database
+await sql.query`
+  MERGE UserPortfolios AS target
+  USING (SELECT ${userId} AS GitHubUserId) AS source
+  ON target.GitHubUserId = source.GitHubUserId
+  WHEN MATCHED THEN
+    UPDATE SET PortfolioJson = ${JSON.stringify(portfolioRepos)}, UpdatedAt = GETDATE()
+  WHEN NOT MATCHED THEN
+    INSERT (GitHubUserId, PortfolioJson)
+    VALUES (${userId}, ${JSON.stringify(portfolioRepos)});
+`;
+
+// Optional: update saves count
+await sql.query`
+  MERGE PortfolioAnalytics AS target
+  USING (SELECT ${userId} AS GitHubUserId) AS source
+  ON target.GitHubUserId = source.GitHubUserId
+  WHEN MATCHED THEN
+    UPDATE SET PortfolioSaves = PortfolioSaves + 1, UpdatedAt = GETDATE()
+  WHEN NOT MATCHED THEN
+    INSERT (GitHubUserId, PortfolioSaves)
+    VALUES (${userId}, 1);
+`;
+
+res.redirect('/dashboard');
   }
 );
 
