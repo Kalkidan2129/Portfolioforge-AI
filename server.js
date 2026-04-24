@@ -224,7 +224,18 @@ await sql.query`
     VALUES (${String(userId)}, ${JSON.stringify(portfolioRepos)}, GETDATE());
 `;
 
-portfolioSaves++;
+await sql.query`
+  MERGE PortfolioAnalytics AS target
+  USING (SELECT ${String(userId)} AS GitHubUserId) AS source
+  ON target.GitHubUserId = source.GitHubUserId
+  WHEN MATCHED THEN
+    UPDATE SET
+      PortfolioSaves = PortfolioSaves + 1,
+      UpdatedAt = GETDATE()
+  WHEN NOT MATCHED THEN
+    INSERT (GitHubUserId, PortfolioViews, PortfolioSaves, UpdatedAt)
+    VALUES (${String(userId)}, 0, 1, GETDATE());
+`;
 res.json({ message: 'Portfolio saved to database', count: portfolioRepos.length });
 });
 
@@ -261,7 +272,18 @@ try {
   console.error('❌ Error loading portfolio from DB:', err);
   return res.status(500).send('Failed to load portfolio from database');
 }
-  portfolioViews++;
+  await sql.query`
+  MERGE PortfolioAnalytics AS target
+  USING (SELECT ${String(userId)} AS GitHubUserId) AS source
+  ON target.GitHubUserId = source.GitHubUserId
+  WHEN MATCHED THEN
+    UPDATE SET
+      PortfolioViews = PortfolioViews + 1,
+      UpdatedAt = GETDATE()
+  WHEN NOT MATCHED THEN
+    INSERT (GitHubUserId, PortfolioViews, PortfolioSaves, UpdatedAt)
+    VALUES (${String(userId)}, 1, 0, GETDATE());
+`;
   const username = req.user.profile.username;
   const techSet = new Set();
   portfolio.forEach(project => {
@@ -313,6 +335,16 @@ if (portfolio.length === 0) {
   const projectsList = portfolio.map(project => 
     `<li><strong>${project.title}</strong> - ${project.summary} (${project.tech === 'Not specified' ? 'N/A' : project.tech}) <a href="${project.link}">View</a></li>`
   ).join('');
+  const analyticsResult = await sql.query`
+  SELECT PortfolioViews, PortfolioSaves
+  FROM PortfolioAnalytics
+  WHERE GitHubUserId = ${userId}
+`;
+
+const analytics = analyticsResult.recordset[0] || {
+  PortfolioViews: 0,
+  PortfolioSaves: 0
+};
   res.send(`
   <style>
     body {
@@ -377,8 +409,8 @@ if (portfolio.length === 0) {
     ${recommendations.map(r => `<li>${r}</li>`).join('')}
   </ul>
   <h2>Analytics</h2>
-  <p>Portfolio Views: ${portfolioViews}</p>
-  <p>Portfolio Saves: ${portfolioSaves}</p>
+  <p>Portfolio Views: ${analytics.PortfolioViews}</p>
+  <p>Portfolio Saves: ${analytics.PortfolioSaves}</p>
 </div>
 `);
 });
