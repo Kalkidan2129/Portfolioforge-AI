@@ -37,7 +37,124 @@ let portfolioViews = 0;
 let portfolioSaves = 0;
 
 app.get('/', (req, res) => {
-  res.send('Server is running');
+  res.send(`
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f8f9fb;
+        margin: 0;
+        padding: 60px;
+        color: #222;
+        text-align: center;
+      }
+
+      .home-container {
+        background: white;
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 50px;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      }
+
+      h1 {
+        color: #1f3c88;
+        font-size: 36px;
+        margin-bottom: 15px;
+      }
+
+      p {
+        font-size: 18px;
+        line-height: 1.6;
+        margin-bottom: 30px;
+      }
+
+      a {
+        display: inline-block;
+        background-color: #1f6feb;
+        color: white;
+        padding: 12px 22px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+      }
+
+      a:hover {
+        background-color: #174ea6;
+      }
+    </style>
+
+    <div class="home-container">
+      <h1>PortfolioForge AI</h1>
+      <p>Turn your GitHub projects into a clean, professional portfolio with recommendations and analytics.</p>
+      <a href="/auth/github">Login with GitHub</a>
+    </div>
+  `);
+});
+
+app.get('/dashboard', (req, res) => {
+  if (!req.user) {
+    return res.redirect('/');
+  }
+
+  const username = req.user.profile.username;
+
+  res.send(`
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f8f9fb;
+        margin: 0;
+        padding: 50px;
+        color: #222;
+      }
+
+      .dashboard {
+        background: white;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      }
+
+      h1 {
+        color: #1f3c88;
+      }
+
+      .actions {
+        margin-top: 30px;
+        display: grid;
+        gap: 15px;
+      }
+
+      a {
+        display: block;
+        background-color: #1f6feb;
+        color: white;
+        padding: 14px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+        text-align: center;
+      }
+
+      a:hover {
+        background-color: #174ea6;
+      }
+    </style>
+
+    <div class="dashboard">
+      <h1>Welcome, ${username}</h1>
+      <p>Manage your GitHub-powered portfolio from one place.</p>
+
+      <div class="actions">
+        <a href="/api/portfolio/save-from-github">Save / Refresh GitHub Portfolio</a>
+        <a href="/portfolio/view">View Portfolio</a>
+        <a href="/api/analytics">View Analytics JSON</a>
+      </div>
+    </div>
+  `);
 });
 
 app.get('/api/test', (req, res) => {
@@ -244,7 +361,7 @@ app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] 
 app.get('/auth/github/callback', 
   passport.authenticate('github', { failureRedirect: '/' }),
   (req, res) => {
-    res.send('Login successful');
+    res.redirect('/dashboard');
   }
 );
 
@@ -415,11 +532,37 @@ const analytics = analyticsResult.recordset[0] || {
 `);
 });
 
-app.get('/api/analytics', (req, res) => {
-  res.json({
-    portfolioViews,
-    portfolioSaves
-  });
+app.get('/api/analytics', async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const userId = String(req.user.profile.id);
+
+  try {
+    const result = await sql.query`
+      SELECT PortfolioViews, PortfolioSaves
+      FROM PortfolioAnalytics
+      WHERE GitHubUserId = ${userId}
+    `;
+
+    if (result.recordset.length === 0) {
+      return res.json({
+        portfolioViews: 0,
+        portfolioSaves: 0
+      });
+    }
+
+    const analytics = result.recordset[0];
+
+    res.json({
+      portfolioViews: analytics.PortfolioViews,
+      portfolioSaves: analytics.PortfolioSaves
+    });
+  } catch (err) {
+    console.error('❌ Error fetching analytics from DB:', err);
+    res.status(500).json({ error: 'Failed to fetch analytics from database' });
+  }
 });
 
 connectDB().then(() => {
