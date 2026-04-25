@@ -36,6 +36,55 @@ const items = [];
 let portfolioViews = 0;
 let portfolioSaves = 0;
 
+// Helper function to generate professional project descriptions
+const generateProjectDescription = (project) => {
+  const { title, tech } = project;
+  const language = (tech || '').toLowerCase();
+  
+  if (language === 'python') {
+    return `${title} is a Python-based project focused on data processing, backend development, and automation scripting. It demonstrates practical skills in building efficient data-driven solutions.`;
+  }
+  
+  if (language === 'javascript' || language === 'typescript') {
+    return `${title} is a JavaScript project focused on web development, frontend, or full-stack implementation. It showcases skills in building interactive and responsive web applications.`;
+  }
+  
+  if (language === 'java') {
+    return `${title} is a Java-based application demonstrating object-oriented programming and enterprise software development.`;
+  }
+  
+  if (language === 'go' || language === 'golang') {
+    return `${title} is a Go project highlighting modern backend development and high-performance systems.`;
+  }
+  
+  if (language === 'rust') {
+    return `${title} is a Rust project demonstrating systems programming and memory-safe implementation.`;
+  }
+  
+  if (language === 'c#' || language === 'csharp') {
+    return `${title} is a C# project focused on .NET development and enterprise applications.`;
+  }
+  
+  if (language === 'ruby') {
+    return `${title} is a Ruby project showcasing web development using the Rails framework.`;
+  }
+  
+  if (language === 'php') {
+    return `${title} is a PHP project focused on backend web development and server-side scripting.`;
+  }
+  
+  if (language === 'swift') {
+    return `${title} is a Swift project for iOS/macOS application development.`;
+  }
+  
+  if (language === 'kotlin') {
+    return `${title} is a Kotlin project focused on Android development or JVM-based applications.`;
+  }
+  
+  // Default/general description for unknown languages
+  return `${title} is a software project demonstrating technical implementation and problem-solving skills. It shows practical experience in building functional applications.`;
+};
+
 app.get('/', (req, res) => {
   res.send(`
     <style>
@@ -186,7 +235,12 @@ app.get('/api/repos', async (req, res) => {
   const data = await response.json();
   const portfolioRepos = data.map(repo => ({
     title: repo.name,
-    summary: repo.description || 'No description available',
+    summary: repo.description && repo.description.trim() !== ''
+  ? repo.description
+  : generateProjectDescription({
+      title: repo.name,
+      tech: repo.language
+    }),
     link: repo.html_url,
     tech: repo.language || 'Not specified',
     lastUpdated: repo.updated_at
@@ -321,7 +375,12 @@ app.get('/api/portfolio/save-from-github', async (req, res) => {
   const data = await response.json();
   const portfolioRepos = data.map(repo => ({
     title: repo.name,
-    summary: repo.description || 'No description available',
+    summary: repo.description && repo.description.trim() !== ''
+  ? repo.description
+  : generateProjectDescription({
+      title: repo.name,
+      tech: repo.language
+    }),
     link: repo.html_url,
     tech: repo.language || 'Not specified',
     lastUpdated: repo.updated_at
