@@ -435,7 +435,12 @@ const data = await response.json();
 
 const portfolioRepos = data.map(repo => ({
   title: repo.name,
-  summary: repo.description || 'No description available',
+  summary: repo.description && repo.description.trim() !== ''
+  ? repo.description
+  : generateProjectDescription({
+      title: repo.name,
+      tech: repo.language
+    }),
   link: repo.html_url,
   tech: repo.language || 'Not specified',
   lastUpdated: repo.updated_at
