@@ -328,6 +328,8 @@ app.get('/api/portfolio/save-from-github', async (req, res) => {
   }));
   const userId = req.user.profile.id;
 
+const username = req.user.profile.username;
+
 await sql.query`
   MERGE UserPortfolios AS target
   USING (SELECT ${String(userId)} AS GitHubUserId) AS source
@@ -335,10 +337,11 @@ await sql.query`
   WHEN MATCHED THEN
     UPDATE SET
       PortfolioJson = ${JSON.stringify(portfolioRepos)},
+      GitHubUsername = ${username},
       UpdatedAt = GETDATE()
   WHEN NOT MATCHED THEN
-    INSERT (GitHubUserId, PortfolioJson, UpdatedAt)
-    VALUES (${String(userId)}, ${JSON.stringify(portfolioRepos)}, GETDATE());
+    INSERT (GitHubUserId, GitHubUsername, PortfolioJson, UpdatedAt)
+    VALUES (${String(userId)}, ${username}, ${JSON.stringify(portfolioRepos)}, GETDATE());
 `;
 
 await sql.query`
@@ -574,6 +577,81 @@ const analytics = analyticsResult.recordset[0] || {
   <p>Portfolio Saves: ${analytics.PortfolioSaves}</p>
 </div>
 `);
+});
+
+app.get('/portfolio/:username', async (req, res) => {
+  const username = req.params.username;
+
+  try {
+    const result = await sql.query`
+      SELECT PortfolioJson, GitHubUsername 
+      FROM UserPortfolios
+      WHERE GitHubUsername = ${username}
+    `;
+
+    if (result.recordset.length === 0) {
+      return res.send('Portfolio not found');
+    }
+
+    const portfolio = JSON.parse(result.recordset[0].PortfolioJson);
+
+    const projectsList = portfolio.map(project => `
+  <li style="margin-bottom: 15px;">
+    <strong style="font-size: 16px;">${project.title}</strong><br/>
+    <span style="color: #555;">${project.summary}</span><br/>
+    <a href="${project.link}" target="_blank" 
+       style="color: #1f6feb; font-weight: bold; text-decoration: none;">
+       🔗 View Project
+    </a>
+  </li>
+`).join('');
+
+    res.send(`
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f8f9fb;
+      margin: 0;
+      padding: 40px;
+      color: #222;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      color: #1f3c88;
+    }
+    h2 {
+      margin-top: 30px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+  </style>
+
+  <div class="container">
+    <h1>${username}'s Portfolio</h1>
+    <p>This portfolio highlights projects and development work from GitHub.</p>
+
+    <h2>Projects</h2>
+    <ul>${projectsList}</ul>
+  </div>
+`);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error loading portfolio');
+  }
 });
 
 app.get('/api/analytics', async (req, res) => {
