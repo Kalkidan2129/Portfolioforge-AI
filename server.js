@@ -561,7 +561,12 @@ if (portfolio.length === 0) {
   
 }
   const projectsList = portfolio.map(project => 
-    `<li><strong>${project.title}</strong> - ${project.summary} (${project.tech === 'Not specified' ? 'N/A' : project.tech}) <a href="${project.link}">View</a></li>`
+    `<div class="project-card">
+      <h3 class="project-title">${project.title}</h3>
+      <p class="project-description">${project.summary}</p>
+      <p class="project-tech">Tech: ${project.tech === 'Not specified' ? 'N/A' : project.tech}</p>
+      <a href="${project.link}" class="project-link" target="_blank">View Project →</a>
+    </div>`
   ).join('');
   const analyticsResult = await sql.query`
   SELECT PortfolioViews, PortfolioSaves
@@ -608,8 +613,49 @@ const analytics = analyticsResult.recordset[0] || {
       margin: 10px 0;
       max-width: 1000px;
     }
+    .project-card {
+      background: #fafbfc;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      transition: box-shadow 0.2s ease;
+    }
+    .project-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .project-title {
+      margin: 0 0 8px 0;
+      color: #1f3c88;
+      font-size: 18px;
+    }
+    .project-description {
+      margin: 0 0 12px 0;
+      color: #444;
+      line-height: 1.5;
+    }
+    .project-tech {
+      margin: 0 0 12px 0;
+      color: #666;
+      font-size: 14px;
+    }
+    .project-link {
+      display: inline-block;
+      color: #1f6feb;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .project-link:hover {
+      text-decoration: underline;
+    }
+    .projects-grid {
+      display: grid;
+      gap: 16px;
+    }
     ul {
-      padding-left: 25px;
+      padding-left: 0;
+      list-style: none;
     }
     li {
       margin-bottom: 10px;
@@ -660,14 +706,12 @@ app.get('/portfolio/:username', async (req, res) => {
     const portfolio = JSON.parse(result.recordset[0].PortfolioJson);
 
     const projectsList = portfolio.map(project => `
-  <li style="margin-bottom: 15px;">
-    <strong style="font-size: 16px;">${project.title}</strong><br/>
-    <span style="color: #555;">${project.summary}</span><br/>
-    <a href="${project.link}" target="_blank" 
-       style="color: #1f6feb; font-weight: bold; text-decoration: none;">
-       🔗 View Project
-    </a>
-  </li>
+  <div class="project-card">
+    <h3 class="project-title">${project.title}</h3>
+    <p class="project-description">${project.summary}</p>
+    <p class="project-tech">Tech: ${project.tech === 'Not specified' ? 'N/A' : project.tech}</p>
+    <a href="${project.link}" class="project-link" target="_blank">View Project →</a>
+  </div>
 `).join('');
 
     res.send(`
@@ -676,30 +720,63 @@ app.get('/portfolio/:username', async (req, res) => {
       font-family: Arial, sans-serif;
       background-color: #f8f9fb;
       margin: 0;
-      padding: 40px;
+      padding: 40px 0;
       color: #222;
     }
     .container {
-      max-width: 900px;
-      margin: 0 auto;
       background: white;
       padding: 30px 40px;
       border-radius: 12px;
+      max-width: 1000px;
+      width: 90%;
+      margin: 0 auto;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }
     h1 {
       color: #1f3c88;
+      margin-bottom: 20px;
     }
     h2 {
+      color: #2c3e50;
       margin-top: 30px;
-      border-bottom: 1px solid #ddd;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #dfe6ee;
       padding-bottom: 5px;
     }
-    ul {
-      padding-left: 20px;
+    .project-card {
+      background: #fafbfc;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-    li {
-      margin-bottom: 8px;
+    .project-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .project-title {
+      margin: 0 0 8px 0;
+      color: #1f3c88;
+      font-size: 18px;
+    }
+    .project-description {
+      margin: 0 0 12px 0;
+      color: #444;
+      line-height: 1.5;
+    }
+    .project-tech {
+      margin: 0 0 12px 0;
+      color: #666;
+      font-size: 14px;
+    }
+    .project-link {
+      display: inline-block;
+      color: #1f6feb;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .project-link:hover {
+      text-decoration: underline;
     }
   </style>
 
@@ -708,7 +785,7 @@ app.get('/portfolio/:username', async (req, res) => {
     <p>This portfolio highlights projects and development work from GitHub.</p>
 
     <h2>Projects</h2>
-    <ul>${projectsList}</ul>
+    ${projectsList}
   </div>
 `);
 
